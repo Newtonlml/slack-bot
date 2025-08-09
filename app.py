@@ -9,6 +9,7 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from pathlib import Path
 from dotenv import load_dotenv
+from zoneinfo import ZoneInfo
 
 __version__ = "0.1.0"
 
@@ -16,11 +17,13 @@ __version__ = "0.1.0"
 MEETING_DAY = "monday"      # Day of the week when journal club happens
 REMINDER_DAY = "thursday"   # Day of the week to send the reminder
 REMINDER_HOUR = "23:01"     # Time (24hr) to send the reminder
+TIMEZONE = os.environ.get("TIMEZONE", "America/Santiago")  # Default timezone
 
 # === JOURNAL CLUB PRESENTER FUNCTIONS ===
-PRESENTED_FILE = "presented.csv"
-MEMBERS_FILE = "members.csv"
-REMINDER_FILE = "reminder.csv"
+DATA_DIR = "data/"
+PRESENTED_FILE = DATA_DIR + "presented.csv"
+MEMBERS_FILE = DATA_DIR + "members.csv"
+REMINDER_FILE = DATA_DIR + "reminder.csv"
 
 # === LOAD ENVIRONMENT VARIABLES ===
 env_path = Path('.') / '.env'
@@ -31,21 +34,23 @@ app = App(token=os.environ["SLACK_API_TOKEN"])
 AUTHORIZED_USER_ID = os.environ["ADMIN_USER_ID"]  # Your Slack user ID
 JOURNAL_CHANNEL_ID = os.environ["JOURNAL_CHANNEL_ID"]
 
+
 @app.message("hello")
 def message_hello(message, say):
     # say() sends a message to the channel where the event was triggered
     say(f"Hey there <@{message['user']}>!")
 
+
 # === BIRTHDAY GREETINGS FUNCTION ===
 def check_and_send_birthday_messages():
-    today = datetime.now().strftime("%m-%d")
+    today = datetime.now(ZoneInfo(TIMEZONE)).strftime("%m-%d")
     with open(MEMBERS_FILE, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             if row["date"] == today:
                 user_id = row["user_id"]
                 name = row["name"]
-                channel_id = os.getenv("BIRTHDAY_CHANNEL_ID")
+                channel_id = os.getenv("BIRTHDAY_CHANNEL_ID") or ""
                 try:
                     app.client.chat_postMessage(
                         channel=channel_id,
@@ -144,7 +149,7 @@ def send_journal_reminder():
 # === UTILITY TO FIND DATE OF NEXT GIVEN WEEKDAY ===
 def schedule_reminder_for_next(day_name, time_str, job_func):
     weekday_number = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].index(day_name)
-    now = datetime.now()
+    now = datetime.now(ZoneInfo(TIMEZONE))
     days_ahead = (weekday_number - now.weekday() + 7) % 7
     if days_ahead == 0 and now.time() > datetime.strptime(time_str, "%H:%M").time():
         days_ahead = 7
