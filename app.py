@@ -17,6 +17,11 @@ MEETING_DAY = "monday"      # Day of the week when journal club happens
 REMINDER_DAY = "thursday"   # Day of the week to send the reminder
 REMINDER_HOUR = "23:01"     # Time (24hr) to send the reminder
 
+# === JOURNAL CLUB PRESENTER FUNCTIONS ===
+PRESENTED_FILE = "presented.csv"
+MEMBERS_FILE = "members.csv"
+REMINDER_FILE = "reminder.csv"
+
 # === LOAD ENVIRONMENT VARIABLES ===
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -34,7 +39,7 @@ def message_hello(message, say):
 # === BIRTHDAY GREETINGS FUNCTION ===
 def check_and_send_birthday_messages():
     today = datetime.now().strftime("%m-%d")
-    with open("birthdays.csv", newline='') as csvfile:
+    with open(MEMBERS_FILE, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             if row["date"] == today:
@@ -50,20 +55,18 @@ def check_and_send_birthday_messages():
                 except Exception as e:
                     print(f"Failed to send birthday message to {name}: {e}")
 
-# === JOURNAL CLUB PRESENTER FUNCTIONS ===
-PRESENTED_FILE = "presented.csv"
-MEMBERS_FILE = "members.csv"
-REMINDER_FILE = "reminder.csv"
 
 def get_all_members():
     with open(MEMBERS_FILE, newline='') as csvfile:
         return list(csv.DictReader(csvfile))
+
 
 def get_presented_members():
     if not os.path.exists(PRESENTED_FILE):
         return []
     with open(PRESENTED_FILE, newline='') as csvfile:
         return list(csv.DictReader(csvfile))
+
 
 def save_presented_member(member):
     fieldnames = ["name", "user_id", "date"]
@@ -74,9 +77,11 @@ def save_presented_member(member):
             writer.writeheader()
         writer.writerow(member)
 
+
 def reset_presented_list():
     if os.path.exists(PRESENTED_FILE):
         os.remove(PRESENTED_FILE)
+
 
 def select_random_presenter():
     members = get_all_members()
@@ -99,6 +104,7 @@ def select_random_presenter():
 
     return selected
 
+
 # === COMMAND TO SELECT PRESENTER ===
 @app.command("/select_presenter")
 def handle_select_presenter(ack, body, say):
@@ -111,6 +117,7 @@ def handle_select_presenter(ack, body, say):
     selected = select_random_presenter()
     say(f"📢 The next journal club presenter is <@{selected['user_id']}>! 🎓")
     print(f"Selected {selected['name']} for journal club.")
+
 
 # === REMINDER FUNCTION ===
 def send_journal_reminder():
@@ -133,6 +140,7 @@ def send_journal_reminder():
         except Exception as e:
             print(f"Failed to send reminder: {e}")
 
+
 # === UTILITY TO FIND DATE OF NEXT GIVEN WEEKDAY ===
 def schedule_reminder_for_next(day_name, time_str, job_func):
     weekday_number = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].index(day_name)
@@ -151,6 +159,7 @@ def schedule_reminder_for_next(day_name, time_str, job_func):
         getattr(schedule.every(), REMINDER_DAY).at(REMINDER_HOUR).do(send_journal_reminder).tag("weekly_reminder")
 
     Thread(target=delayed_job, daemon=True).start()
+
 
 # === START BOT & SCHEDULER ===
 if __name__ == "__main__":
