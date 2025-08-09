@@ -17,6 +17,9 @@ __version__ = "0.1.0"
 MEETING_DAY = "monday"      # Day of the week when journal club happens
 REMINDER_DAY = "thursday"   # Day of the week to send the reminder
 REMINDER_HOUR = "23:01"     # Time (24hr) to send the reminder
+
+# Schedule birthday greetings daily at 9 AM
+HH, MM = 9, 0
 TIMEZONE = os.environ.get("TIMEZONE", "America/Santiago")  # Default timezone
 
 # === JOURNAL CLUB PRESENTER FUNCTIONS ===
@@ -166,10 +169,24 @@ def schedule_reminder_for_next(day_name, time_str, job_func):
     Thread(target=delayed_job, daemon=True).start()
 
 
+def get_server_time_for_santiago(hour, minute):
+    santiago_tz = ZoneInfo(TIMEZONE)
+    server_tz = datetime.now().astimezone().tzinfo
+
+    now_santiago = datetime.now(santiago_tz)
+    target_dt_santiago = now_santiago.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    if target_dt_santiago < now_santiago:
+        target_dt_santiago += timedelta(days=1)
+
+    target_dt_server = target_dt_santiago.astimezone(server_tz)
+    return target_dt_server.strftime("%H:%M")
+
+
 # === START BOT & SCHEDULER ===
 if __name__ == "__main__":
-    # Schedule birthday greetings daily at 9 AM
-    schedule.every().day.at("09:00").do(check_and_send_birthday_messages)
+    server_time_str = get_server_time_for_santiago(HH, MM)
+    schedule.every().day.at(server_time_str).do(check_and_send_birthday_messages)
 
     # Schedule reminder for presenter
     schedule_reminder_for_next(REMINDER_DAY, REMINDER_HOUR, send_journal_reminder)
