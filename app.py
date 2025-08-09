@@ -10,6 +10,8 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from pathlib import Path
 from dotenv import load_dotenv
 
+__version__ = "0.1.0"
+
 # === CONFIGURABLE CONSTANTS ===
 MEETING_DAY = "monday"      # Day of the week when journal club happens
 REMINDER_DAY = "thursday"   # Day of the week to send the reminder
