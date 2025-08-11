@@ -10,6 +10,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from pathlib import Path
 from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
+import json
 
 __version__ = "0.1.0"
 
@@ -36,6 +37,92 @@ load_dotenv(dotenv_path=env_path)
 app = App(token=os.environ["SLACK_API_TOKEN"])
 AUTHORIZED_USER_ID = os.environ["ADMIN_USER_ID"]  # Your Slack user ID
 JOURNAL_CHANNEL_ID = os.environ["JOURNAL_CHANNEL_ID"]
+
+
+CONFIG_FILE = DATA_DIR + "config.json"
+
+
+# Load config with defaults if file doesn't exist
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    return {
+        "meeting_day": "monday",
+        "reminder_day": "thursday",
+        "reminder_hour": "23:01"
+    }
+
+
+# Save config to file
+def save_config(config):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f)
+
+
+# Load initial config
+config = load_config()
+
+# Replace constants with config values
+MEETING_DAY = config["meeting_day"]
+REMINDER_DAY = config["reminder_day"]
+REMINDER_HOUR = config["reminder_hour"]
+
+
+def reload_schedules():
+    """Clear existing reminder jobs and reschedule with new config."""
+    global MEETING_DAY, REMINDER_DAY, REMINDER_HOUR
+    schedule.clear("weekly_reminder")  # Remove old weekly reminder
+    schedule_reminder_for_next(REMINDER_DAY, REMINDER_HOUR, send_journal_reminder)
+    print(f"🔄 Scheduler reloaded with: {REMINDER_DAY} at {REMINDER_HOUR}")
+
+
+@app.command("/configure_meeting")
+def handle_configure_meeting(ack, body, say):
+    ack()
+    user_id = body["user_id"]
+    if user_id != AUTHORIZED_USER_ID:
+        say(f"Sorry <@{user_id}>, you're not authorized to run this command.")
+        return
+
+    # Expect format: /configure_meeting meeting_day reminder_day reminder_hour
+    # Example: /configure_meeting monday thursday 15:30
+    text = body.get("text", "").strip().lower()
+    parts = text.split()
+
+    if len(parts) != 3:
+        say("Usage: `/configure_meeting MEETING_DAY REMINDER_DAY REMINDER_HOUR` (e.g. `/configure_meeting monday thursday 15:30`)")
+        return
+
+    meeting_day, reminder_day, reminder_hour = parts
+    valid_days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+    if meeting_day not in valid_days or reminder_day not in valid_days:
+        say(f"Days must be one of: {', '.join(valid_days)}")
+        return
+
+    try:
+        time.strptime(reminder_hour, "%H:%M")
+    except ValueError:
+        say("Reminder hour must be in HH:MM format (24h).")
+        return
+
+    # Update config and save
+    config["meeting_day"] = meeting_day
+    config["reminder_day"] = reminder_day
+    config["reminder_hour"] = reminder_hour
+    save_config(config)
+
+    # Update globals
+    global MEETING_DAY, REMINDER_DAY, REMINDER_HOUR
+    MEETING_DAY = meeting_day
+    REMINDER_DAY = reminder_day
+    REMINDER_HOUR = reminder_hour
+
+    # Reload scheduler so changes take effect immediately
+    reload_schedules()
+
+    say(f"✅ Configuration updated!\n- Meeting day: {MEETING_DAY.capitalize()}\n- Reminder day: {REMINDER_DAY.capitalize()}\n- Reminder time: {REMINDER_HOUR}")
 
 
 @app.message("hello")
