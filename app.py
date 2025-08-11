@@ -128,6 +128,9 @@ def message_hello(message, say):
 
 # === BIRTHDAY GREETINGS FUNCTION ===
 def check_and_send_birthday_messages():
+    if not os.path.exists(MEMBERS_FILE):
+        print("Members file not found.")
+        return
     today = datetime.now(ZoneInfo(TIMEZONE)).strftime("%m-%d")
     with open(MEMBERS_FILE, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
