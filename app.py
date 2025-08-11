@@ -209,6 +209,39 @@ def handle_select_presenter(ack, body, say):
     print(f"Selected {selected['name']} for journal club.")
 
 
+@app.command("/get_channel_members")
+def handle_get_channel_members(ack, body, say):
+    ack()
+
+    user_id = body["user_id"]
+    if user_id != AUTHORIZED_USER_ID:
+        say(f"Sorry <@{user_id}>, you're not authorized to run this command.")
+        return
+
+    text = body.get("text", "").strip()
+    if not text:
+        say("Please provide the channel ID. Example: `/get_channel_members C12345678`")
+        return
+
+    channel_id = text
+
+    try:
+        members = []
+        cursor = None
+        while True:
+            response = app.client.conversations_members(channel=channel_id, cursor=cursor)
+            members.extend(response["members"])
+            cursor = response.get("response_metadata", {}).get("next_cursor")
+            if not cursor:
+                break
+
+        # Save to CSV or just show them
+        say(f"Found {len(members)} members in <#{channel_id}>:\n" + "\n".join([f"`{m}`" for m in members]))
+
+    except Exception as e:
+        say(f"Error fetching members: {e}")
+
+
 # === REMINDER FUNCTION ===
 def send_journal_reminder():
     if not os.path.exists(REMINDER_FILE):
