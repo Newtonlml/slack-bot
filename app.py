@@ -14,11 +14,6 @@ import json
 
 __version__ = "0.1.0"
 
-# === CONFIGURABLE CONSTANTS ===
-MEETING_DAY = "monday"      # Day of the week when journal club happens
-REMINDER_DAY = "thursday"   # Day of the week to send the reminder
-REMINDER_HOUR = "23:01"     # Time (24hr) to send the reminder
-
 # Schedule birthday greetings daily at 9 AM
 HH, MM = 9, 0
 TIMEZONE = os.environ.get("TIMEZONE", "America/Santiago")  # Default timezone
