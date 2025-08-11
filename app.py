@@ -235,8 +235,13 @@ def handle_get_channel_members(ack, body, say):
             if not cursor:
                 break
 
-        # Save to CSV or just show them
-        say(f"Found {len(members)} members in <#{channel_id}>:\n" + "\n".join([f"`{m}`" for m in members]))
+        results = []
+        for member_id in members:
+            user_info = app.client.users_info(user=member_id)
+            user_name = user_info["user"]["real_name"]  # or user_info["user"]["profile"]["display_name"]
+            results.append(f"{user_name} (`{member_id}`)")
+
+        say(f"Found {len(results)} members in <#{channel_id}>:\n" + "\n".join(results))
 
     except Exception as e:
         say(f"Error fetching members: {e}")
