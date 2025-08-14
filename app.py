@@ -324,11 +324,15 @@ def add_member(ack, respond, command):
         return
     try:
         text_parts = command["text"].strip().split()
-        if len(text_parts) != 4:
+        if len(text_parts) < 4:
             respond("❌ Usage: `/add_member <name> <user_id> <mm-dd> <yes/no>`")
             return
+        member_user_id = text_parts[-3]
+        date = text_parts[-2]
+        in_journal_club = text_parts[-1]
 
-        name, member_user_id, date, in_journal_club = text_parts
+        # Everything before that is the name
+        name = " ".join(text_parts[:-3])
 
         # Create file if not exists
         file_exists = os.path.isfile(MEMBERS_FILE)
