@@ -317,13 +317,18 @@ def get_server_time_for_santiago(hour, minute):
 @app.command("/add_member")
 def add_member(ack, respond, command):
     ack()
+
+    user_id = command["user_id"]
+    if user_id != AUTHORIZED_USER_ID:
+        respond(f"Sorry <@{user_id}>, you're not authorized to run this command.")
+        return
     try:
         text_parts = command["text"].strip().split()
         if len(text_parts) != 4:
             respond("❌ Usage: `/add_member <name> <user_id> <mm-dd> <yes/no>`")
             return
 
-        name, user_id, date, in_journal_club = text_parts
+        name, member_user_id, date, in_journal_club = text_parts
 
         # Create file if not exists
         file_exists = os.path.isfile(MEMBERS_FILE)
@@ -334,9 +339,9 @@ def add_member(ack, respond, command):
             if not file_exists:
                 writer.writeheader()
 
-            writer.writerow({"name": name, "user_id": user_id, "date": date, "journal_club": in_journal_club.lower()})
+            writer.writerow({"name": name, "user_id": member_user_id, "date": date, "journal_club": in_journal_club.lower()})
 
-        respond(f"✅ Added member: {name} ({user_id}) with birthday {date}")
+        respond(f"✅ Added member: {name} ({member_user_id}) with birthday {date}")
 
     except Exception as e:
         respond(f"❌ Error adding member: {e}")
@@ -346,6 +351,10 @@ def add_member(ack, respond, command):
 @app.command("/remove_member")
 def remove_member(ack, respond, command):
     ack()
+    user_id = command["user_id"]
+    if user_id != AUTHORIZED_USER_ID:
+        respond(f"Sorry <@{user_id}>, you're not authorized to run this command.")
+        return
     try:
         user_id_to_remove = command["text"].strip()
         if not user_id_to_remove:
