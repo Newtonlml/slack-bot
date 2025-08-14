@@ -378,7 +378,7 @@ def remove_member(ack, respond, command):
 
         if removed:
             with open(MEMBERS_FILE, mode="w", newline="") as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=["name", "user_id", "date"])
+                writer = csv.DictWriter(csvfile, fieldnames=["name", "user_id", "date", "journal_club"])
                 writer.writeheader()
                 writer.writerows(rows)
             respond(f"✅ Removed member with user_id {user_id_to_remove}")
