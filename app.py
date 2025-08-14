@@ -151,7 +151,14 @@ def check_and_send_birthday_messages():
 
 def get_all_members():
     with open(MEMBERS_FILE, newline='') as csvfile:
-        return list(csv.DictReader(csvfile))
+        members = list(csv.DictReader(csvfile))
+
+    # Keep only members who have not opted out of journal club
+    members = [
+        m for m in members
+        if m.get("journal_club", "").strip().lower() != "no"
+    ]
+    return members
 
 
 def get_presented_members():
@@ -304,6 +311,73 @@ def get_server_time_for_santiago(hour, minute):
 
     target_dt_server = target_dt_santiago.astimezone(server_tz)
     return target_dt_server.strftime("%H:%M")
+
+
+# === ADD MEMBER COMMAND ===
+@app.command("/add_member")
+def add_member(ack, respond, command):
+    ack()
+    try:
+        text_parts = command["text"].strip().split()
+        if len(text_parts) != 4:
+            respond("❌ Usage: `/add_member <name> <user_id> <mm-dd> <yes/no>`")
+            return
+
+        name, user_id, date, in_journal_club = text_parts
+
+        # Create file if not exists
+        file_exists = os.path.isfile(MEMBERS_FILE)
+        with open(MEMBERS_FILE, mode="a", newline="") as csvfile:
+            fieldnames = ["name", "user_id", "date", "journal_club"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            if not file_exists:
+                writer.writeheader()
+
+            writer.writerow({"name": name, "user_id": user_id, "date": date, "journal_club": in_journal_club.lower()})
+
+        respond(f"✅ Added member: {name} ({user_id}) with birthday {date}")
+
+    except Exception as e:
+        respond(f"❌ Error adding member: {e}")
+
+
+# === REMOVE MEMBER COMMAND ===
+@app.command("/remove_member")
+def remove_member(ack, respond, command):
+    ack()
+    try:
+        user_id_to_remove = command["text"].strip()
+        if not user_id_to_remove:
+            respond("❌ Usage: `/remove_member <user_id>`")
+            return
+
+        if not os.path.isfile(MEMBERS_FILE):
+            respond("❌ No members file found.")
+            return
+
+        rows = []
+        removed = False
+
+        with open(MEMBERS_FILE, newline="") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                if row["user_id"] != user_id_to_remove:
+                    rows.append(row)
+                else:
+                    removed = True
+
+        if removed:
+            with open(MEMBERS_FILE, mode="w", newline="") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=["name", "user_id", "date"])
+                writer.writeheader()
+                writer.writerows(rows)
+            respond(f"✅ Removed member with user_id {user_id_to_remove}")
+        else:
+            respond(f"❌ No member found with user_id {user_id_to_remove}")
+
+    except Exception as e:
+        respond(f"❌ Error removing member: {e}")
 
 
 # === START BOT & SCHEDULER ===
