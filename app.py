@@ -169,7 +169,7 @@ def get_presented_members():
 
 
 def save_presented_member(member):
-    fieldnames = ["name", "user_id", "date"]
+    fieldnames = ["name", "user_id", "date", "journal_club"]
     write_header = not os.path.exists(PRESENTED_FILE)
     with open(PRESENTED_FILE, mode='a', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -198,7 +198,7 @@ def select_random_presenter():
 
     # Save for reminder
     with open(REMINDER_FILE, "w", newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=["name", "user_id", "date"])
+        writer = csv.DictWriter(f, fieldnames=["name", "user_id", "date", "journal_club"])
         writer.writeheader()
         writer.writerow(selected)
 
