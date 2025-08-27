@@ -40,3 +40,7 @@ dist/
 
 # CSV files
 *.csv
+
+#configs
+*.json
+*.yaml
