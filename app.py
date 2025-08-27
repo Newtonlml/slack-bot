@@ -15,7 +15,7 @@ import json
 __version__ = "0.1.0"
 
 # Schedule birthday greetings daily at 9 AM
-HH, MM = 9, 0
+HH, MM = 23, 32
 TIMEZONE = os.environ.get("TIMEZONE", "America/Santiago")  # Default timezone
 
 # === JOURNAL CLUB PRESENTER FUNCTIONS ===
@@ -143,6 +143,8 @@ def check_and_send_birthday_messages():
     with open(MEMBERS_FILE, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
+            if not row["date"]:
+                continue  # Skip members with no birthday
             if row["date"] == today:
                 user_id = row["user_id"]
                 name = row["name"]
@@ -305,38 +307,53 @@ def get_server_time_for_santiago(hour, minute):
 @app.command("/add_member")
 def add_member(ack, respond, command):
     ack()
-
     user_id = command["user_id"]
     if user_id != AUTHORIZED_USER_ID:
         respond(f"Sorry <@{user_id}>, you're not authorized to run this command.")
         return
-    try:
-        text_parts = command["text"].strip().split()
-        if len(text_parts) < 4:
-            respond("❌ Usage: `/add_member <name> <user_id> <mm-dd> <yes/no>`")
-            return
-        member_user_id = text_parts[-3]
-        date = text_parts[-2]
-        in_journal_club = text_parts[-1]
 
-        # Everything before that is the name
-        name = " ".join(text_parts[:-3])
+    # Usage: /add_member <name> <user_id> [<mm-dd>] <yes/no>
+    args = command["text"].strip().split()
+    if len(args) < 3:
+        respond("❌ Usage: `/add_member <name> <user_id> [<mm-dd>] <yes/no>` (birthday is optional)")
+        return
 
-        # Create file if not exists
-        file_exists = os.path.isfile(MEMBERS_FILE)
-        with open(MEMBERS_FILE, mode="a", newline="") as csvfile:
-            fieldnames = ["name", "user_id", "date", "journal_club"]
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    # Try to detect if the third argument is a date (mm-dd)
+    name = []
+    date = ""
+    user_id_arg = ""
+    journal_club = ""
 
-            if not file_exists:
-                writer.writeheader()
+    # If the second-to-last argument looks like a date, use it
+    if len(args) >= 4 and len(args[-2]) == 5 and args[-2][2] == "-":
+        name = args[:-3]
+        user_id_arg = args[-3]
+        date = args[-2]
+        journal_club = args[-1]
+    else:
+        name = args[:-2]
+        user_id_arg = args[-2]
+        date = ""
+        journal_club = args[-1]
 
-            writer.writerow({"name": name, "user_id": member_user_id, "date": date, "journal_club": in_journal_club.lower()})
+    name_str = " ".join(name)
+    journal_club = journal_club.lower()
 
-        respond(f"✅ Added member: {name} ({member_user_id}) with birthday {date}")
+    # Write to CSV, always with newline=''
+    file_exists = os.path.isfile(MEMBERS_FILE)
+    with open(MEMBERS_FILE, mode="a", newline="") as csvfile:
+        fieldnames = ["name", "user_id", "date", "journal_club"]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        if not file_exists or os.stat(MEMBERS_FILE).st_size == 0:
+            writer.writeheader()
+        writer.writerow({
+            "name": name_str,
+            "user_id": user_id_arg,
+            "date": date,
+            "journal_club": journal_club
+        })
 
-    except Exception as e:
-        respond(f"❌ Error adding member: {e}")
+    respond(f"✅ Added member: {name_str} ({user_id_arg})" + (f" with birthday {date}" if date else " (no birthday set)"))
 
 
 # === REMOVE MEMBER COMMAND ===
@@ -408,7 +425,10 @@ def show_members(ack, say, command):
         return
     with open(MEMBERS_FILE, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
-        members = [f"- {row['name']} | Birthday: {row['date']} | Journal Club: {row['journal_club']}" for row in reader]
+        members = [
+            f"- {row['name']} | Birthday: {row['date'] if row['date'] else 'N/A'} | Journal Club: {row['journal_club']}"
+            for row in reader
+        ]
     if not members:
         say("No members found.")
     else:
