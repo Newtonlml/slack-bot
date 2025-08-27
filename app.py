@@ -68,8 +68,16 @@ def reload_schedules():
     """Clear existing reminder jobs and reschedule with new config."""
     global MEETING_DAY, REMINDER_DAY, REMINDER_HOUR
     schedule.clear("weekly_reminder")  # Remove old weekly reminder
-    schedule_reminder_for_next(REMINDER_DAY, REMINDER_HOUR, send_journal_reminder)
-    print(f"🔄 Scheduler reloaded with: {REMINDER_DAY} at {REMINDER_HOUR}")
+
+    # Convert REMINDER_HOUR to server time if needed
+    server_time_str = get_server_time_for_santiago(
+        int(REMINDER_HOUR.split(":")[0]),
+        int(REMINDER_HOUR.split(":")[1])
+    )
+
+    # Schedule the reminder using the schedule library only
+    getattr(schedule.every(), REMINDER_DAY).at(server_time_str).do(send_journal_reminder).tag("weekly_reminder")
+    print(f"🔄 Scheduler reloaded with: {REMINDER_DAY} at {server_time_str} (server time)")
 
 
 @app.command("/configure_meeting")
@@ -279,26 +287,6 @@ def send_journal_reminder():
             print(f"Failed to send reminder: {e}")
 
 
-# === UTILITY TO FIND DATE OF NEXT GIVEN WEEKDAY ===
-def schedule_reminder_for_next(day_name, time_str, job_func):
-    weekday_number = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].index(day_name)
-    now = datetime.now(ZoneInfo(TIMEZONE))
-    days_ahead = (weekday_number - now.weekday() + 7) % 7
-    if days_ahead == 0 and now.time() > datetime.strptime(time_str, "%H:%M").time():
-        days_ahead = 7
-    run_date = now + timedelta(days=days_ahead)
-    run_time = run_date.replace(hour=int(time_str.split(":")[0]), minute=int(time_str.split(":")[1]), second=0, microsecond=0)
-    delay = (run_time - now).total_seconds()
-
-    def delayed_job():
-        time.sleep(delay)
-        job_func()
-        # Reschedule the reminder for next week
-        getattr(schedule.every(), REMINDER_DAY).at(REMINDER_HOUR).do(send_journal_reminder).tag("weekly_reminder")
-
-    Thread(target=delayed_job, daemon=True).start()
-
-
 def get_server_time_for_santiago(hour, minute):
     santiago_tz = ZoneInfo(TIMEZONE)
     server_tz = datetime.now().astimezone().tzinfo
@@ -393,13 +381,61 @@ def remove_member(ack, respond, command):
         respond(f"❌ Error removing member: {e}")
 
 
+@app.command("/show_config")
+def show_config(ack, say, command):
+    ack()
+    user_id = command["user_id"]
+    if user_id != AUTHORIZED_USER_ID:
+        say(f"Sorry <@{user_id}>, you're not authorized to run this command.")
+        return
+    say(
+        f"*Current Meeting Configuration:*\n"
+        f"- Meeting day: `{MEETING_DAY.capitalize()}`\n"
+        f"- Reminder day: `{REMINDER_DAY.capitalize()}`\n"
+        f"- Reminder hour: `{REMINDER_HOUR}`"
+    )
+
+
+@app.command("/show_members")
+def show_members(ack, say, command):
+    ack()
+    user_id = command["user_id"]
+    if user_id != AUTHORIZED_USER_ID:
+        say(f"Sorry <@{user_id}>, you're not authorized to run this command.")
+        return
+    if not os.path.exists(MEMBERS_FILE):
+        say("No members file found.")
+        return
+    with open(MEMBERS_FILE, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        members = [f"- {row['name']} | Birthday: {row['date']} | Journal Club: {row['journal_club']}" for row in reader]
+    if not members:
+        say("No members found.")
+    else:
+        say("*Current Members:*\n" + "\n".join(members))
+
+
+@app.command("/group_webpage")
+def group_webpage(ack, say, command):
+    ack()
+    url = os.environ.get("GROUP_WEBPAGE_URL")
+    if url:
+        say(f"🌐 Group webpage: {url}")
+    else:
+        say("Group webpage URL is not configured in the .env file.")
+
+
 # === START BOT & SCHEDULER ===
 if __name__ == "__main__":
     server_time_str = get_server_time_for_santiago(HH, MM)
     schedule.every().day.at(server_time_str).do(check_and_send_birthday_messages)
 
-    # Schedule reminder for presenter
-    schedule_reminder_for_next(REMINDER_DAY, REMINDER_HOUR, send_journal_reminder)
+    # Schedule reminder for presenter using only the schedule library
+    server_reminder_time = get_server_time_for_santiago(
+        int(REMINDER_HOUR.split(":")[0]),
+        int(REMINDER_HOUR.split(":")[1])
+    )
+    getattr(schedule.every(), REMINDER_DAY).at(server_reminder_time).do(send_journal_reminder).tag("weekly_reminder")
 
     def run_scheduler():
         while True:
