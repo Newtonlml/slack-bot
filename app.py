@@ -15,7 +15,7 @@ import json
 __version__ = "0.1.0"
 
 # Schedule birthday greetings daily at 9 AM
-HH, MM = 23, 32
+HH, MM = 12, 30
 TIMEZONE = os.environ.get("TIMEZONE", "America/Santiago")  # Default timezone
 
 # === JOURNAL CLUB PRESENTER FUNCTIONS ===
